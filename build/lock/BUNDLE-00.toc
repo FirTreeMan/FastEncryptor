@@ -1,3 +1,0 @@
-([('lock',
-   '/Users/shilohk/PycharmProjects/FastEncryptor/dist/lock',
-   'EXECUTABLE')],)
