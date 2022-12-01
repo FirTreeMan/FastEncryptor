@@ -50,10 +50,10 @@ contrast = (125, 110, 131)
 def zipitems(password, location, *exclusions):
     filecount = 0
     foldercount = 0
-    blacklist = ['lock.exe', 'encpwd.txt', 'readme.txt', 'lock.py'] + [ex for ex in exclusions]
+    blacklist = ['lock.exe', 'lock.app', 'encpwd.txt', 'readme.txt'] + [ex for ex in exclusions]
 
     try:
-        open(location, 'w')
+        open(location, 'x')
         os.remove(location)
     except OSError:
         changescreen('encryptx')
@@ -69,9 +69,10 @@ def zipitems(password, location, *exclusions):
                     zipper.write(path, basename(path))
                     filecount += 1
             for foldername in folders:
-                path = os.path.join(root, foldername)
-                zipper.write(path, basename(path))
-                foldercount += 1
+                if foldername not in blacklist:
+                    path = os.path.join(root, foldername)
+                    zipper.write(path, basename(path))
+                    foldercount += 1
 
     genpwd(password, location)
     changescreen('encrypty')
@@ -81,7 +82,7 @@ def zipitems(password, location, *exclusions):
 def unzipitems(password, location):
     try:
         open(location, 'r')
-    except FileNotFoundError:
+    except FileNotFoundError or PermissionError:
         changescreen('decryptx')
         return
 
@@ -92,9 +93,12 @@ def unzipitems(password, location):
 
 
 def genpwd(password, location="unknown"):
-    with open(r"encpwd.txt", 'a') as file:
-        if password is not None and password.strip() != "":
-            file.write(f'{location[0]}: {password[0]}\n')
+    try:
+        with open(r"encpwd.txt", 'a') as file:
+            if password is not None and password.strip() != "":
+                file.write(f'{location[0]}: {password[0]}\n')
+    except PermissionError:
+        print("FileNotFound")
 
 
 def changescreen(_screen="main", oldscreen=None):
