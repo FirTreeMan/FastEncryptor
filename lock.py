@@ -1,7 +1,7 @@
-import os
+import os.path
+from sys import argv
 from os.path import basename
-import pyzipper
-from pyzipper import ZIP_STORED, ZIP_DEFLATED, ZIP_LZMA, ZIP_BZIP2
+from pyzipper import AESZipFile, ZIP_STORED, ZIP_DEFLATED, ZIP_LZMA, ZIP_BZIP2, WZ_AES
 from pygame import init, time, display, sprite, rect, draw, mouse, font, event, quit, \
     KEYDOWN, K_ESCAPE, K_RETURN, K_BACKSPACE, QUIT
 
@@ -15,17 +15,20 @@ sliders = sprite.Group()
 buttons = sprite.Group()
 textboxes = sprite.Group()
 font1 = "Courier New"
+os.chdir(os.path.dirname(os.path.abspath(argv[0])))
 
 # editables are in a list, [0] is the value, [-1] is the names, and the rest are options
 """
 screens:
 'main'
 'encrypt'
+'encryptp'
 'encryptx'
 'encrypty'
 'decrypt'
+'decryptp'
 'decryptx'
-'encrypty'
+'decrypty'
 'exit'
 """
 screen = "main"
@@ -50,27 +53,38 @@ contrast = (125, 110, 131)
 def zipitems(password, location, *exclusions):
     filecount = 0
     foldercount = 0
-    blacklist = ['lock.exe', 'lock.app', 'encpwd.txt', 'readme.txt'] + [ex for ex in exclusions]
+    blacklist = [basename(__file__), location, 'encpwd.txt', 'readme.txt'] + [ex for ex in exclusions]
 
     try:
         open(location, 'x')
         os.remove(location)
+    except FileExistsError:
+        changescreen('encryptx')
+        print("Zip File Exists")
+        return
+    except PermissionError:
+        changescreen('encryptx')
+        print("No Permission")
+        return
     except OSError:
         changescreen('encryptx')
+        print("OS Error")
         return
 
-    with pyzipper.AESZipFile(location, 'w', compression=compression[0], encryption=pyzipper.WZ_AES) as zipper:
-        zipper.pwd = password
-        zipper.encryption = encryption[0]
+    with AESZipFile(location, 'w', compression=compression[0], encryption=WZ_AES) as zipper:
+        changescreen('encryptp')
+        zipper.setpassword(password.encode('utf-8'))
+        zipper.setencryption(WZ_AES, nbits=encryption[0])
         for root, folders, files in os.walk(os.getcwd()):
-            for filename in files:
-                if filename not in blacklist:
-                    path = os.path.join(root, filename)
+            for file in files:
+                if file not in blacklist:
+                    path = os.path.join(root, file)
+                    print(path)
                     zipper.write(path, basename(path))
                     filecount += 1
-            for foldername in folders:
-                if foldername not in blacklist:
-                    path = os.path.join(root, foldername)
+            for folder in folders:
+                if folder not in blacklist:
+                    path = os.path.join(root, folder)
                     zipper.write(path, basename(path))
                     foldercount += 1
 
@@ -86,9 +100,13 @@ def unzipitems(password, location):
         changescreen('decryptx')
         return
 
-    with pyzipper.AESZipFile(location) as zipper:
-        zipper.pwd = password
-        zipper.extractall(os.getcwd())
+    with AESZipFile(location) as zipper:
+        changescreen('decryptp')
+        zipper.setpassword(password.encode('utf-8'))
+        try:
+            zipper.extractall(os.getcwd())
+        except RuntimeError:
+            changescreen('decryptx')
     changescreen('decrypty')
 
 
@@ -96,9 +114,9 @@ def genpwd(password, location="unknown"):
     try:
         with open(r"encpwd.txt", 'a') as file:
             if password is not None and password.strip() != "":
-                file.write(f'{location[0]}: {password[0]}\n')
+                file.write(f'{location}: {password}\n')
     except PermissionError:
-        print("FileNotFound")
+        print("No Permission to write password")
 
 
 def changescreen(_screen="main", oldscreen=None):
@@ -236,6 +254,8 @@ class Button(sprite.Sprite):
                             if isinstance(item, str) and "/*" in item:
                                 itemflags[i] = item
                                 self.funcargs[i] = [s.text for s in textboxes if s.ident == item.replace("/*", "")]
+                                if len(self.funcargs[i]) == 1:
+                                    self.funcargs[i] = self.funcargs[i][0]
                         self.func(*self.funcargs)
                         for i in itemflags.keys():
                             self.funcargs[i] = itemflags[i]
@@ -387,15 +407,13 @@ buttons.add(Button(changescreen, [65, 35], 'encrypt', bgval=[170, 75], border=10
                    _screen='encrypt'),
             Button(genpwd, [530, 300], "/*passwordE", "/*locationE", border=10, text="GEN PWD", textsize=25,
                    _screen='encrypt'),
+            Button(changescreen, [60, 380], 'encrypt', border=10, text="BACK", _screen='encryptx'),
+            Button(changescreen, [60, 380], 'main', border=10, text="BACK", _screen='encrypty'),
+            Button(changescreen, [530, 380], 'exit', border=10, text="EXIT", _screen='encrypty'),
             Button(changescreen, [60, 380], 'main', border=10, text="BACK", _screen='decrypt'),
             Button(unzipitems, [530, 380], "/*passwordD", "/*locationD", border=10, text="GO", _screen='decrypt'),
-            # Button(changescreen, [60, 280], 'encrypty', border=10, text="test", _screen='encrypt'),
-            # Button(changescreen, [60, 280], 'decrypty', border=10, text="test", _screen='decrypt'),
-            Button(changescreen, [60, 380], 'encrypt', border=10, text="BACK", _screen='encryptx'),
             Button(changescreen, [60, 380], 'decrypt', border=10, text="BACK", _screen='decryptx'),
-            Button(changescreen, [60, 380], 'main', border=10, text="BACK", _screen='encrypty'),
             Button(changescreen, [60, 380], 'main', border=10, text="BACK", _screen='decrypty'),
-            Button(changescreen, [530, 380], 'exit', border=10, text="EXIT", _screen='encrypty'),
             Button(changescreen, [530, 380], 'exit', border=10, text="EXIT", _screen='decrypty'))
 # noinspection PyTypeChecker
 textboxes.add(TextBox([305, 50], writable=False, title="", text="encrypt and compress your files", bgcolors=[bg, bg]),
@@ -403,18 +421,22 @@ textboxes.add(TextBox([305, 50], writable=False, title="", text="encrypt and com
               TextBox([305, 212.5], writable=False, title="", text="decrypt with your password", bgcolors=[bg, bg]),
               TextBox([305, 237.5], writable=False, title="", text="also decompresses the files", bgcolors=[bg, bg]),
               TextBox([305, 375], writable=False, title="", text="USE FILE NAME EXTENSIONS", bgcolors=[bg, bg]),
-              TextBox([305, 400], writable=False, title="", text="(like .py)", bgcolors=[bg, bg]),
+              TextBox([305, 400], writable=False, title="", text="(like .zip)", bgcolors=[bg, bg]),
               TextBox([25, 150], border=5, ident="passwordE", reqs=[True, False], title="password", _screen='encrypt'),
               TextBox([25, 255], border=5, ident="locationE", reqs=[True, True], title="location", _screen='encrypt'),
               TextBox([395, 150], createshell=True, childid="blklstE", border=5, title="blacklist", _screen='encrypt'),
-              TextBox([210, 45], border=5, ident="passwordD", title="password", _screen='decrypt'),
-              TextBox([210, 150], border=5, ident="locationD", title="location", _screen='decrypt'),
+              TextBox([210, 50], writable=False, title="", text="ZIPPING", bgcolors=[bg, bg],
+                      _screen='encryptp'),
               TextBox([210, 50], writable=False, title="", text="ERROR: INVALID ZIP FILE NAME/LOCATION",
                       bgcolors=[bg, bg], _screen='encryptx'),
-              TextBox([210, 50], writable=False, title="", text="ERROR: INVALID ZIP FILE LOCATION", bgcolors=[bg, bg],
-                      _screen='decryptx'),
               TextBox([210, 50], writable=False, title="", text="ENCRYPTION FINISHED", bgcolors=[bg, bg],
                       _screen='encrypty'),
+              TextBox([210, 45], border=5, ident="passwordD", title="password", _screen='decrypt'),
+              TextBox([210, 150], border=5, ident="locationD", title="location", _screen='decrypt'),
+              TextBox([210, 50], writable=False, title="", text="UNZIPPING", bgcolors=[bg, bg],
+                      _screen='decryptp'),
+              TextBox([210, 50], writable=False, title="", text="ERROR: INVALID ZIP FILE LOCATION", bgcolors=[bg, bg],
+                      _screen='decryptx'),
               TextBox([210, 50], writable=False, title="", text="DECRYPTION FINISHED", bgcolors=[bg, bg],
                       _screen='decrypty'))
 
