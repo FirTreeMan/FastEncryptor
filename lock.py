@@ -1,6 +1,5 @@
 import os.path
 from sys import argv
-from os.path import basename
 from pyzipper import AESZipFile, ZIP_STORED, ZIP_DEFLATED, ZIP_LZMA, ZIP_BZIP2, WZ_AES
 from pygame import init, time, display, sprite, rect, draw, mouse, font, event, quit, \
     KEYDOWN, K_ESCAPE, K_RETURN, K_BACKSPACE, QUIT
@@ -53,7 +52,7 @@ contrast = (125, 110, 131)
 def zipitems(password, location, *exclusions):
     filecount = 0
     foldercount = 0
-    blacklist = [basename(__file__), location, 'encpwd.txt', 'readme.txt'] + [ex for ex in exclusions]
+    blacklist = [location, 'encpwd.txt', 'readme.txt'] + [ex for ex in exclusions]
 
     try:
         open(location, 'x')
@@ -79,13 +78,14 @@ def zipitems(password, location, *exclusions):
             for file in files:
                 if file not in blacklist:
                     path = os.path.join(root, file)
-                    print(path)
-                    zipper.write(path, basename(path))
+                    print(f"found file: {file}")
+                    zipper.write(path, os.path.relpath(path, os.getcwd()))
                     filecount += 1
             for folder in folders:
                 if folder not in blacklist:
                     path = os.path.join(root, folder)
-                    zipper.write(path, basename(path))
+                    print(f"found folder: {path}")
+                    zipper.write(path, os.path.relpath(path, os.getcwd()))
                     foldercount += 1
 
     genpwd(password, location)
@@ -104,9 +104,10 @@ def unzipitems(password, location):
         changescreen('decryptp')
         zipper.setpassword(password.encode('utf-8'))
         try:
-            zipper.extractall(os.getcwd())
+            zipper.extractall()
         except RuntimeError:
             changescreen('decryptx')
+            return
     changescreen('decrypty')
 
 
@@ -432,7 +433,7 @@ textboxes.add(TextBox([305, 50], writable=False, title="", text="encrypt and com
               TextBox([210, 50], writable=False, title="", text="ENCRYPTION FINISHED", bgcolors=[bg, bg],
                       _screen='encrypty'),
               TextBox([210, 45], border=5, ident="locationD", title="location", _screen='decrypt'),
-              TextBox([210, 50], border=5, ident="passwordD", title="password", _screen='decrypt'),
+              TextBox([210, 150], border=5, ident="passwordD", title="password", _screen='decrypt'),
               TextBox([210, 50], writable=False, title="", text="UNZIPPING", bgcolors=[bg, bg],
                       _screen='decryptp'),
               TextBox([210, 50], writable=False, title="", text="ERROR: INVALID ZIP FILE LOCATION", bgcolors=[bg, bg],
